@@ -32,6 +32,7 @@ jobs:
         if: runner.os == 'macOS'
         run: |
           brew install --cask docker
+          brew install colima docker-buildx
           colima start
 
       - name: Run GoReleaser
