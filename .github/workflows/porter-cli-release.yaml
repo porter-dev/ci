@@ -27,6 +27,13 @@ jobs:
         with:
           go-version-file: go.mod
 
+      # m1 runners do not come with docker natively installed
+      - name: Install Docker on macOS
+        if: runner.os == 'macOS'
+        run: |
+          brew install --cask docker
+          colima start
+
       - name: Run GoReleaser
         uses: goreleaser/goreleaser-action@v6
         with:
