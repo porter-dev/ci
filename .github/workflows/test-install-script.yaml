@@ -2,11 +2,7 @@ name: Test install script on all platforms
 
 on:
   workflow_dispatch:
-    inputs:
-      tag:
-        description: "Commit SHA or tag to check out"
-        required: true
-        type: string
+    inputs: {}
 
 permissions:
   contents: read
