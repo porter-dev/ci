@@ -14,7 +14,7 @@ permissions:
 jobs:
   tests:
     name: Tests
-    runs-on: ubicloud-standard-8
+    runs-on: ubicloud-standard-8-arm
     steps:
       - name: stuff
         run: |
