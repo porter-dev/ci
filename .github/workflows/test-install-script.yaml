@@ -1,4 +1,4 @@
-name: Test Workflow
+name: Test install script on all platforms
 
 on:
   workflow_dispatch:
@@ -13,10 +13,18 @@ permissions:
 
 jobs:
   tests:
-    name: Tests
-    runs-on: macos-latest
+    strategy:
+      matrix:
+        os:
+          - ubuntu-latest
+          - windows-latest
+          - ubicloud-standard-4
+          - ubicloud-standard-4-arm
+          - macos-latest
+    name: Test install script on ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
     steps:
-      - name: stuff
+      - name: Export runner info
         run: |
           uname
           arch
