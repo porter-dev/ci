@@ -12,7 +12,7 @@ permissions:
 
 jobs:
   goreleaser:
-    runs-on: ubicloud-standard-4-arm
+    runs-on: ubicloud-standard-8
     steps:
       - name: Checkout porter-dev/porter at ${{ github.event.inputs.tag }}
         uses: actions/checkout@v4
