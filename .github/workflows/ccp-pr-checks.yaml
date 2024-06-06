@@ -1,8 +1,4 @@
-name: golangci-lint
-
-concurrency:
-  group: pr-go-${{ github.event.pull_request.number || github.ref }}
-  cancel-in-progress: true
+name: ccp-golangci-lint
 
 on:
   workflow_dispatch:
@@ -11,12 +7,20 @@ on:
         description: "Commit SHA or tag to check out"
         required: true
         type: string
+      pr_number:
+        description: "PR number"
+        required: true
+        type: string
+
+concurrency:
+  group: pr-go-${{ github.event.inputs.pr_number || github.ref }}
+  cancel-in-progress: true
 
 permissions:
   contents: read
 
 jobs:
-  golangci:
+  ccp-golangci:
     name: Tests and Linter
     runs-on: ubicloud-standard-8
     steps:
