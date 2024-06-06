@@ -1,0 +1,27 @@
+name: ccp-golangci-lint
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Commit SHA or tag to check out"
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  tests:
+    name: Tests
+    runs-on: ubicloud-standard-8
+    steps:
+      - name: stuff
+        run: |
+          uname
+          arch
+      - name: Setup porter
+        uses: porter-dev/setup-porter@v0.1.0
+      - name: Deploy stack
+        timeout-minutes: 30
+        run: exec porter version
