@@ -18,7 +18,7 @@ permissions:
 jobs:
   golangci:
     name: Tests and Linter
-    runs-on: ubuntu-latest
+    runs-on: ubicloud-standard-8
     steps:
       - name: Checkout porter-dev/porter at ${{ github.event.inputs.tag }}
         uses: actions/checkout@v4
