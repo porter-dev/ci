@@ -3,7 +3,7 @@ on:
   workflow_dispatch:
     inputs:
       tag:
-        description: "Tag for the release"
+        description: "Commit SHA or tag to check out"
         required: true
         type: string
 
