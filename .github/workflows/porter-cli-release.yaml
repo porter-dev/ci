@@ -27,6 +27,11 @@ jobs:
         with:
           go-version-file: go.mod
 
+      - name: Docker logins
+        run: echo $GITHUB_TOKEN | docker login ghcr.io -u USERNAME --password-stdin
+        env:
+          GITHUB_TOKEN: ${{ secrets.PORTERSUPPORT_GITHUB_TOKEN }}
+
       - name: Run GoReleaser
         uses: goreleaser/goreleaser-action@v6
         with:
