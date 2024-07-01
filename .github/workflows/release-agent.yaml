@@ -10,6 +10,10 @@ on:
 permissions:
   contents: write
 
+env:
+  WORK_DIR: agent
+  TAG_PREFIX: agent/
+
 jobs:
   goreleaser:
     runs-on: ubicloud-standard-8
@@ -21,11 +25,16 @@ jobs:
           ref: ${{ github.event.inputs.tag }}
           token: ${{ secrets.PORTERSUPPORT_GITHUB_TOKEN }}
           fetch-tags: true
+      - name: Remove tag prefix
+        run: |
+          echo "TAG_PREFIX=${{ env.TAG_PREFIX }}"
+          export TAG_WITHOUT_PREFIX=$(sed 's/${{ env.TAG_PREFIX }}//g')
+          echo "TAG_WITHOUT_PREFIX=$TAG_WITHOUT_PREFIX" >> $GITHUB_ENV
 
       - name: Set up Go
         uses: actions/setup-go@v5
         with:
-          go-version-file: agent/go.mod
+          go-version-file: ${{ env.WORK_DIR }}/go.mod
 
       - name: Docker logins
         run: echo $GITHUB_TOKEN | docker login ghcr.io -u USERNAME --password-stdin
@@ -35,9 +44,10 @@ jobs:
       - name: Run GoReleaser
         uses: goreleaser/goreleaser-action@v6
         with:
-          workdir: agent
+          workdir:  ${{ env.WORK_DIR }}
           distribution: goreleaser
           version: v2
           args: release --clean --parallelism=4
         env:
           GITHUB_TOKEN: ${{ secrets.PORTERSUPPORT_GITHUB_TOKEN }}
+          GORELEASER_CURRENT_TAG: ${{ env.TAG_PREFIX }}
