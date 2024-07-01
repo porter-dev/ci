@@ -35,7 +35,7 @@ jobs:
       - name: Run GoReleaser
         uses: goreleaser/goreleaser-action@v6
         with:
-          workdir: code/agent
+          workdir: agent
           distribution: goreleaser
           version: v2
           args: release --clean --parallelism=4
