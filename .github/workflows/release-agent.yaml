@@ -1,0 +1,43 @@
+name: Release Porter Agent
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Commit SHA or tag to check out"
+        required: true
+        type: string
+
+permissions:
+  contents: write
+
+jobs:
+  goreleaser:
+    runs-on: ubicloud-standard-8
+    steps:
+      - name: Checkout porter-dev/porter at ${{ github.event.inputs.tag }}
+        uses: actions/checkout@v4
+        with:
+          repository: porter-dev/code
+          ref: ${{ github.event.inputs.tag }}
+          token: ${{ secrets.PORTERSUPPORT_GITHUB_TOKEN }}
+          fetch-tags: true
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+
+      - name: Docker logins
+        run: echo $GITHUB_TOKEN | docker login ghcr.io -u USERNAME --password-stdin
+        env:
+          GITHUB_TOKEN: ${{ secrets.PORTERSUPPORT_GITHUB_TOKEN }}
+
+      - name: Run GoReleaser
+        uses: goreleaser/goreleaser-action@v6
+        with:
+          workdir: code/agent
+          distribution: goreleaser
+          version: v2
+          args: release --clean --parallelism=4
+        env:
+          GITHUB_TOKEN: ${{ secrets.PORTERSUPPORT_GITHUB_TOKEN }}
