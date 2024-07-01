@@ -11,7 +11,9 @@ permissions:
   contents: write
 
 env:
+  # WORK_DIR is the directory where the go.mod file is located, and goreleaser will be run from
   WORK_DIR: agent
+  # TAG_PREFIX is the prefix of the tag that should be removed before passing to goreleaser
   TAG_PREFIX: agent/
 
 jobs:
@@ -28,8 +30,7 @@ jobs:
       - name: Remove tag prefix
         run: |
           echo "TAG_PREFIX=${{ env.TAG_PREFIX }}"
-          export TAG_WITHOUT_PREFIX=$(sed 's/${{ env.TAG_PREFIX }}//g')
-          echo "TAG_WITHOUT_PREFIX=$TAG_WITHOUT_PREFIX" >> $GITHUB_ENV
+          echo TAG_WITHOUT_PREFIX=$(sed 's/${{ env.TAG_PREFIX }}//g') >> $GITHUB_ENV
 
       - name: Set up Go
         uses: actions/setup-go@v5
@@ -50,4 +51,4 @@ jobs:
           args: release --clean --parallelism=4
         env:
           GITHUB_TOKEN: ${{ secrets.PORTERSUPPORT_GITHUB_TOKEN }}
-          GORELEASER_CURRENT_TAG: ${{ env.TAG_WITHOUT_PREFIX }}
+          GORELEASER_CURRENT_TAG: ${TAG_WITHOUT_PREFIX}
