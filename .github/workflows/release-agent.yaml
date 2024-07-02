@@ -31,6 +31,7 @@ jobs:
         run: |
           echo "TAG_PREFIX=${{ env.TAG_PREFIX }}"
           echo TAG_WITHOUT_PREFIX=$(sed 's|${{ env.TAG_PREFIX }}||g') >> $GITHUB_ENV
+          echo $TAG_WITHOUT_PREFIX
 
       - name: Set up Go
         uses: actions/setup-go@v5
@@ -51,4 +52,4 @@ jobs:
           args: release --clean --parallelism=4
         env:
           GITHUB_TOKEN: ${{ secrets.PORTERSUPPORT_GITHUB_TOKEN }}
-          GORELEASER_CURRENT_TAG: ${TAG_WITHOUT_PREFIX}
+          GORELEASER_CURRENT_TAG: $TAG_WITHOUT_PREFIX
