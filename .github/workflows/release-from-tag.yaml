@@ -1,4 +1,4 @@
-name: Release 
+name: Release ${{ github.event.inputs.tagVersion }}
 on:
   workflow_dispatch:
     inputs:
@@ -20,7 +20,7 @@ permissions:
 
 jobs:
   goreleaser:
-    runs-on: ubicloud-standard-8
+    runs-on: ubicloud-standard-8-arm
     steps:
       - name: Checkout porter-dev/code at ${{ github.event.inputs.checkoutTag }}
         uses: actions/checkout@v4
