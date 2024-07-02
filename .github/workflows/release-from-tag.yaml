@@ -1,4 +1,4 @@
-name: Release ${{ github.event.inputs.tagVersion }}
+name: Release
 on:
   workflow_dispatch:
     inputs:
