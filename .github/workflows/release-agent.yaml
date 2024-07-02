@@ -30,7 +30,7 @@ jobs:
       - name: Remove tag prefix
         run: |
           echo "TAG_PREFIX=${{ env.TAG_PREFIX }}"
-          echo TAG_WITHOUT_PREFIX=$(sed 's|${{ env.TAG_PREFIX }}||g') >> $GITHUB_ENV
+          echo TAG_WITHOUT_PREFIX=$(sed 's|${{ github.event.inputs.tag }}||g') >> $GITHUB_ENV
           echo $TAG_WITHOUT_PREFIX
 
       - name: Set up Go
