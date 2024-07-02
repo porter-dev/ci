@@ -51,4 +51,4 @@ jobs:
           args: release --clean --parallelism=4
         env:
           GITHUB_TOKEN: ${{ secrets.PORTERSUPPORT_GITHUB_TOKEN }}
-          GORELEASER_CURRENT_TAG: $TAG_WITHOUT_PREFIX
+          GORELEASER_CURRENT_TAG: ${{ env.TAG_WITHOUT_PREFIX }}
