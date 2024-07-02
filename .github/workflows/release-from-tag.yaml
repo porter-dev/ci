@@ -1,41 +1,39 @@
-name: Release Porter Agent
+name: Release 
 on:
   workflow_dispatch:
     inputs:
-      tag:
-        description: "Commit SHA or tag to check out"
+      tagVersion:
+        description: "Tag version to release"
+        required: true
+        type: string
+      workDir: 
+        description: "Directory where the go.mod file is located"
+        required: true
+        type: string
+      checkoutTag:
+        description: "Tag to checkout in the code repo"
         required: true
         type: string
 
 permissions:
   contents: write
 
-env:
-  # WORK_DIR is the directory where the go.mod file is located, and goreleaser will be run from
-  WORK_DIR: agent
-  # TAG_PREFIX is the prefix of the tag that should be removed before passing to goreleaser
-  TAG_PREFIX: agent/
-
 jobs:
   goreleaser:
     runs-on: ubicloud-standard-8
     steps:
-      - name: Checkout porter-dev/porter at ${{ github.event.inputs.tag }}
+      - name: Checkout porter-dev/code at ${{ github.event.inputs.checkoutTag }}
         uses: actions/checkout@v4
         with:
           repository: porter-dev/code
-          ref: ${{ github.event.inputs.tag }}
+          ref: ${{ github.event.inputs.checkoutTag }}
           token: ${{ secrets.PORTERSUPPORT_GITHUB_TOKEN }}
           fetch-tags: true
-
-      - name: Remove tag prefix
-        run: |
-          echo TAG_WITHOUT_PREFIX=$(sed 's|${{ env.TAG_PREFIX }}||g' <<< ${{ github.event.inputs.tag }} ) >> $GITHUB_ENV
 
       - name: Set up Go
         uses: actions/setup-go@v5
         with:
-          go-version-file: ${{ env.WORK_DIR }}/go.mod
+          go-version-file: ${{ github.event.inputs.workDir }}/go.mod
 
       - name: Docker logins
         run: echo $GITHUB_TOKEN | docker login ghcr.io -u USERNAME --password-stdin
@@ -45,10 +43,10 @@ jobs:
       - name: Run GoReleaser
         uses: goreleaser/goreleaser-action@v6
         with:
-          workdir:  ${{ env.WORK_DIR }}
+          workdir:  ${{ github.event.inputs.workDir }}
           distribution: goreleaser
           version: v2
           args: release --clean --parallelism=4 --skip validate
         env:
           GITHUB_TOKEN: ${{ secrets.PORTERSUPPORT_GITHUB_TOKEN }}
-          GORELEASER_CURRENT_TAG: ${{ env.TAG_WITHOUT_PREFIX }}
+          GORELEASER_CURRENT_TAG: ${{ github.event.inputs.tagVersion }}
