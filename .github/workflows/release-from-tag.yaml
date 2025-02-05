@@ -33,11 +33,16 @@ jobs:
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v3
 
+      - name: Clean Go
+        run: |
+          rm -rf ~/go/pkg/mod
+          rm -rf ~/.cache/go-build
+
       - name: Set up Go
         uses: actions/setup-go@v5
         with:
           go-version-file: ${{ github.event.inputs.workDir }}/go.mod
-          cache-dependency-path: ${{ github.event.inputs.workDir }}/go.sum
+          cache: false
 
       - name: Docker logins
         run: echo $GITHUB_TOKEN | docker login ghcr.io -u USERNAME --password-stdin
