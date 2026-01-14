@@ -59,3 +59,41 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.PORTERSUPPORT_GITHUB_TOKEN }}
           GORELEASER_CURRENT_TAG: ${{ github.event.inputs.tagVersion }}
+
+      - name: Prepare release signing key
+        if: always()
+        run: |
+          echo "Writing signing key to disk"
+          umask 077
+          # Write the private key PEM from the secret as-is (multiline)
+          printf "%s" "$PORTER_RELEASE_SIGNING_KEY" > release-key.pem
+          test -s release-key.pem || { echo "Signing key is empty" >&2; exit 1; }
+        env:
+          PORTER_RELEASE_SIGNING_KEY: ${{ secrets.PORTER_RELEASE_SIGNING_KEY }}
+
+      - name: Sign checksums manifest
+        run: |
+          test -f dist/checksums.txt || { echo "dist/checksums.txt not found" >&2; exit 1; }
+          # Create detached signature over checksums.txt using RSA key
+          openssl dgst -sha256 \
+            -sign release-key.pem \
+            -passin env:PORTER_RELEASE_SIGNING_KEY_PASS \
+            -out dist/checksums.txt.sig \
+            dist/checksums.txt
+          ls -l dist/checksums.txt dist/checksums.txt.sig
+        env:
+          PORTER_RELEASE_SIGNING_KEY_PASS: ${{ secrets.PORTER_RELEASE_SIGNING_KEY_PASS }}
+
+      - name: Ensure GitHub CLI is available
+        run: |
+          if ! command -v gh >/dev/null 2>&1; then
+            sudo apt-get update -y
+            sudo apt-get install -y gh
+          fi
+
+      - name: Upload checksums signature to GitHub Release (porter-dev/releases)
+        run: |
+          # Upload to the same tag used by GoReleaser (e.g., v1.2.3) in porter-dev/releases
+          gh release upload "${{ github.event.inputs.tagVersion }}" dist/checksums.txt.sig --repo porter-dev/releases --clobber | cat
+        env:
+          GH_TOKEN: ${{ secrets.PORTERSUPPORT_GITHUB_TOKEN }}
