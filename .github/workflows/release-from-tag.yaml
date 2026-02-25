@@ -49,6 +49,12 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.PORTERSUPPORT_GITHUB_TOKEN }}
 
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@main
+        with:
+          role-to-assume: porter-releases
+          aws-region: us-east-2
+
       - name: Run GoReleaser
         uses: goreleaser/goreleaser-action@v6
         with:
