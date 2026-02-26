@@ -17,6 +17,7 @@ on:
 
 permissions:
   contents: write
+  id-token: write   # This is required for requesting the JWT
 
 jobs:
   goreleaser:
@@ -52,7 +53,6 @@ jobs:
       - name: Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@main
         with:
-          id-token: write
           role-to-assume: arn:aws:iam::996403393253:role/porter-releases
           aws-region: us-east-2
 
