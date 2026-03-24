@@ -50,12 +50,6 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.PORTERSUPPORT_GITHUB_TOKEN }}
 
-      - name: Configure AWS Credentials
-        uses: aws-actions/configure-aws-credentials@main
-        with:
-          role-to-assume: arn:aws:iam::996403393253:role/porter-releases
-          aws-region: us-east-2
-
       - name: Run GoReleaser
         uses: goreleaser/goreleaser-action@v6
         with:
@@ -67,3 +61,7 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.PORTERSUPPORT_GITHUB_TOKEN }}
           GORELEASER_CURRENT_TAG: ${{ github.event.inputs.tagVersion }}
           RELEASE_BUCKET: ${{ vars.RELEASE_BUCKET }}
+          RELEASE_BUCKET_REGION: ${{ vars.RELEASE_BUCKET_REGION }}
+          RELEASE_BUCKET_ENDPOINT: ${{ vars.RELEASE_BUCKET_ENDPOINT }}
+          AWS_ACCESS_KEY_ID: ${{ secrets.CLOUDFLARE_R2_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.CLOUDFLARE_R2_SECRET_ACCESS_KEY }}
