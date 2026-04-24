@@ -24,12 +24,21 @@ jobs:
     name: Tests and Linter
     runs-on: ubicloud-standard-8
     steps:
+      - name: Generate token
+        id: app-token
+        uses: actions/create-github-app-token@v3
+        with:
+          app-id: ${{ secrets.PORTER_CI_APP_ID }}
+          private-key: ${{ secrets.PORTER_CI_APP_PRIVATE_KEY }}
+          owner: porter-dev
+          repositories: porter
+
       - name: Checkout porter-dev/porter at ${{ github.event.inputs.tag }}
         uses: actions/checkout@v4
         with:
           repository: porter-dev/porter
           ref: ${{ github.event.inputs.tag }}
-          token: ${{ secrets.PORTERSUPPORT_GITHUB_TOKEN }}
+          token: ${{ steps.app-token.outputs.token }}
           fetch-tags: true
           fetch-depth: 0
 
