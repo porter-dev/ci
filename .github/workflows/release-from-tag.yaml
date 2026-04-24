@@ -31,7 +31,7 @@ jobs:
           client-id: ${{ vars.PORTER_CI_CLIENT_ID }}
           private-key: ${{ secrets.PORTER_CI_APP_PRIVATE_KEY }}
           owner: porter-dev
-          repositories: code
+          repositories: code,releases
 
       - name: Checkout porter-dev/code at ${{ github.event.inputs.checkoutTag }}
         uses: actions/checkout@v4
@@ -68,7 +68,7 @@ jobs:
           version: v2
           args: release --clean --parallelism=4 --skip validate
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_TOKEN: ${{ steps.app-token.outputs.token }}
           GORELEASER_CURRENT_TAG: ${{ github.event.inputs.tagVersion }}
           RELEASE_BUCKET: ${{ vars.RELEASE_BUCKET }}
           RELEASE_BUCKET_REGION: ${{ vars.RELEASE_BUCKET_REGION }}
