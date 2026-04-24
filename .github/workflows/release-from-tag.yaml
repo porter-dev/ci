@@ -31,7 +31,7 @@ jobs:
           client-id: ${{ vars.PORTER_CI_CLIENT_ID }}
           private-key: ${{ secrets.PORTER_CI_APP_PRIVATE_KEY }}
           owner: porter-dev
-          repositories: code,releases
+          repositories: code,releases,homebrew-porter
 
       - name: Checkout porter-dev/code at ${{ github.event.inputs.checkoutTag }}
         uses: actions/checkout@v4
