@@ -58,7 +58,7 @@ jobs:
       - name: Docker logins
         run: echo $GITHUB_TOKEN | docker login ghcr.io -u USERNAME --password-stdin
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_TOKEN: ${{ steps.app-token.outputs.token }}
 
       - name: Run GoReleaser
         uses: goreleaser/goreleaser-action@v6
