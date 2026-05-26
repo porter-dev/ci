@@ -75,3 +75,16 @@ jobs:
           RELEASE_BUCKET_ENDPOINT: ${{ vars.RELEASE_BUCKET_ENDPOINT }}
           AWS_ACCESS_KEY_ID: ${{ secrets.CLOUDFLARE_R2_ACCESS_KEY_ID }}
           AWS_SECRET_ACCESS_KEY: ${{ secrets.CLOUDFLARE_R2_SECRET_ACCESS_KEY }}
+
+      - name: Publish latest pointer
+        run: |
+          echo -n "${{ github.event.inputs.tagVersion }}" > latest
+          aws s3 cp latest "s3://${RELEASE_BUCKET}/releases/latest" \
+            --endpoint-url "${RELEASE_BUCKET_ENDPOINT}" \
+            --content-type "text/plain"
+        env:
+          RELEASE_BUCKET: ${{ vars.RELEASE_BUCKET }}
+          RELEASE_BUCKET_ENDPOINT: ${{ vars.RELEASE_BUCKET_ENDPOINT }}
+          AWS_ACCESS_KEY_ID: ${{ secrets.CLOUDFLARE_R2_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.CLOUDFLARE_R2_SECRET_ACCESS_KEY }}
+          AWS_DEFAULT_REGION: ${{ vars.RELEASE_BUCKET_REGION }}
