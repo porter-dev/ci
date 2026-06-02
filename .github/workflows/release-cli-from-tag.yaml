@@ -1,0 +1,184 @@
+name: Release CLI
+# The porter CLI builds its darwin binaries with CGO_ENABLED=1 so that
+# 99designs/keyring can use the real macOS Keychain backend (gated behind
+# `//go:build darwin && cgo`). darwin+CGO cannot be cross-compiled from Linux,
+# so the whole goreleaser release runs on a macOS runner, which can build every
+# binary target (darwin natively with CGO, linux/windows via pure-Go
+# CGO_ENABLED=0 cross-compile). The only thing a macOS runner can't do is build
+# the linux Docker image (no Docker daemon), so that is moved to a separate
+# Linux job.
+on:
+  workflow_dispatch:
+    inputs:
+      tagVersion:
+        description: "Tag version to release (e.g. v1.2.3)"
+        required: true
+        type: string
+      workDir:
+        description: "Directory where the go.mod file is located"
+        required: true
+        type: string
+      checkoutTag:
+        description: "Tag to checkout in the code repo"
+        required: true
+        type: string
+
+permissions:
+  contents: write
+  id-token: write
+  packages: write
+
+jobs:
+  build-binaries:
+    # macOS runner: builds darwin (CGO), linux & windows (pure-Go cross-compile),
+    # archives, checksums, R2 blobs, the Homebrew formula, and the GitHub release.
+    runs-on: macos-15-large
+    steps:
+      - name: Generate token
+        id: app-token
+        uses: actions/create-github-app-token@v3
+        with:
+          client-id: ${{ vars.PORTER_CI_CLIENT_ID }}
+          private-key: ${{ secrets.PORTER_CI_APP_PRIVATE_KEY }}
+          owner: porter-dev
+          repositories: code,releases,homebrew-porter
+
+      - name: Checkout porter-dev/code at ${{ github.event.inputs.checkoutTag }}
+        uses: actions/checkout@v4
+        with:
+          repository: porter-dev/code
+          ref: ${{ github.event.inputs.checkoutTag }}
+          token: ${{ steps.app-token.outputs.token }}
+          fetch-tags: true
+
+      - name: Clean Go
+        run: |
+          rm -rf ~/go/pkg/mod
+          rm -rf ~/.cache/go-build
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: ${{ github.event.inputs.workDir }}/go.mod
+          cache: false
+
+      - name: Run GoReleaser
+        uses: goreleaser/goreleaser-action@v6
+        with:
+          workdir: ${{ github.event.inputs.workDir }}
+          distribution: goreleaser
+          version: v2
+          args: release --clean --parallelism=4 --skip=validate
+        env:
+          GOWORK: off
+          GITHUB_TOKEN: ${{ steps.app-token.outputs.token }}
+          GORELEASER_CURRENT_TAG: ${{ github.event.inputs.tagVersion }}
+          RELEASE_BUCKET: ${{ vars.RELEASE_BUCKET }}
+          RELEASE_BUCKET_REGION: ${{ vars.RELEASE_BUCKET_REGION }}
+          RELEASE_BUCKET_ENDPOINT: ${{ vars.RELEASE_BUCKET_ENDPOINT }}
+          AWS_ACCESS_KEY_ID: ${{ secrets.CLOUDFLARE_R2_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.CLOUDFLARE_R2_SECRET_ACCESS_KEY }}
+
+  build-docker:
+    # Linux runner: builds the linux/amd64 porter binary, the Docker image, and
+    # recreates the :version / :latest manifests that goreleaser's dockers/
+    # docker_manifests pipes used to produce. Also publishes the R2 "latest"
+    # pointer here because the macOS runner image does not ship the AWS CLI.
+    runs-on: ubuntu-latest
+    needs: build-binaries
+    steps:
+      - name: Generate token
+        id: app-token
+        uses: actions/create-github-app-token@v3
+        with:
+          client-id: ${{ vars.PORTER_CI_CLIENT_ID }}
+          private-key: ${{ secrets.PORTER_CI_APP_PRIVATE_KEY }}
+          owner: porter-dev
+          repositories: code,releases
+
+      - name: Checkout porter-dev/code at ${{ github.event.inputs.checkoutTag }}
+        uses: actions/checkout@v4
+        with:
+          repository: porter-dev/code
+          ref: ${{ github.event.inputs.checkoutTag }}
+          token: ${{ steps.app-token.outputs.token }}
+          fetch-tags: true
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: ${{ github.event.inputs.workDir }}/go.mod
+          cache: false
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Docker login
+        # Use the repo's default GITHUB_TOKEN, matching the proven shared
+        # release-from-tag.yaml. The app-token variant (porter-dev/ci#14) was
+        # reverted (#97ad992) because it didn't work for the GHCR push; the
+        # porter-cli package has been pushed with GITHUB_TOKEN historically.
+        run: echo "$GITHUB_TOKEN" | docker login ghcr.io -u USERNAME --password-stdin
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build linux binary and image
+        run: |
+          set -euo pipefail
+
+          # goreleaser strips the leading "v" for {{ .Version }}, so the image
+          # tags it produced were 1.2.3-amd64 / 1.2.3 / latest (no "v"). Strip it
+          # here so the tags this job pushes match the old config exactly.
+          tag_version="${{ github.event.inputs.tagVersion }}"
+          version="${tag_version#v}"
+          repo=ghcr.io/porter-dev/releases/porter-cli
+
+          # The checked-out tree is porter-dev/code at checkoutTag, so HEAD is the
+          # released code commit — matches the old config's {{ .FullCommit }}
+          # revision label (github.sha would be the ci repo's commit instead).
+          revision="$(git rev-parse HEAD)"
+          created="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+
+          # Build the linux binary the same way goreleaser's porter-cli build does:
+          # CGO_ENABLED=0 (linux uses the pure-Go keyring backend), GOWORK=off, and
+          # the version ldflag. Place it next to the Dockerfile so the COPY in the
+          # build context resolves (the Dockerfile does `COPY porter ...`).
+          cd legacy-backend/cli
+          CGO_ENABLED=0 GOOS=linux GOARCH=amd64 GOWORK=off go build \
+            -ldflags "-X 'github.com/porter-dev/code/legacy-backend/cli/cmd/version.Version=${tag_version}'" \
+            -o ../../zarf/docker/porter ./main.go
+          cd ../..
+
+          # Build and push the amd64 image, then recreate the :version and :latest
+          # manifests (goreleaser's docker_manifests pipe pointed both at -amd64).
+          docker buildx build --push \
+            --platform=linux/amd64 \
+            --build-arg VERSION="${version}" \
+            --label org.opencontainers.image.title="Porter CLI" \
+            --label org.opencontainers.image.description="CLI for interacting with porter.run" \
+            --label org.opencontainers.image.url=https://github.com/porter-dev/releases \
+            --label org.opencontainers.image.source=https://github.com/porter-dev/releases \
+            --label org.opencontainers.image.version="${version}" \
+            --label org.opencontainers.image.created="${created}" \
+            --label org.opencontainers.image.revision="${revision}" \
+            -t "${repo}:${version}-amd64" \
+            -f zarf/docker/Dockerfile.production.porter-cli \
+            zarf/docker
+
+          docker buildx imagetools create \
+            -t "${repo}:${version}" \
+            -t "${repo}:latest" \
+            "${repo}:${version}-amd64"
+
+      - name: Publish latest pointer
+        run: |
+          echo -n "${{ github.event.inputs.tagVersion }}" > latest
+          aws s3 cp latest "s3://${RELEASE_BUCKET}/releases/latest" \
+            --endpoint-url "${RELEASE_BUCKET_ENDPOINT}" \
+            --content-type "text/plain"
+        env:
+          RELEASE_BUCKET: ${{ vars.RELEASE_BUCKET }}
+          RELEASE_BUCKET_ENDPOINT: ${{ vars.RELEASE_BUCKET_ENDPOINT }}
+          AWS_ACCESS_KEY_ID: ${{ secrets.CLOUDFLARE_R2_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.CLOUDFLARE_R2_SECRET_ACCESS_KEY }}
+          AWS_DEFAULT_REGION: ${{ vars.RELEASE_BUCKET_REGION }}
