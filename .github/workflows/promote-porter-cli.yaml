@@ -33,6 +33,23 @@ jobs:
           owner: porter-dev
           repositories: releases,homebrew-porter
 
+      # Fail before mutating any channel: promotion flips the latest marker
+      # first, so a release that would later fail the Homebrew step (no
+      # stashed formula) must be rejected up front, not left half-promoted.
+      - name: Verify release is promotable
+        env:
+          GITHUB_TOKEN: ${{ steps.app-token.outputs.token }}
+          VERSION: ${{ github.event.inputs.version }}
+        run: |
+          if ! gh release view "$VERSION" --repo porter-dev/releases --json assets --jq '.assets[].name' > assets.txt; then
+            echo "Release $VERSION not found on porter-dev/releases"
+            exit 1
+          fi
+          if ! grep -qx porter.rb assets.txt; then
+            echo "Release $VERSION has no porter.rb asset; releases cut before the promotion flow existed cannot be promoted"
+            exit 1
+          fi
+
       # Drives the CLI's own update prompt, which reads the latest-marked
       # release on porter-dev/releases.
       - name: Mark GitHub release as latest
