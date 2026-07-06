@@ -82,13 +82,15 @@ jobs:
       # can publish the exact formula computed against these artifacts.
       - name: Upload Homebrew formula to release
         if: ${{ github.event.inputs.workDir == 'legacy-backend/cli' }}
+        env:
+          GITHUB_TOKEN: ${{ steps.app-token.outputs.token }}
+          WORK_DIR: ${{ github.event.inputs.workDir }}
+          TAG_VERSION: ${{ github.event.inputs.tagVersion }}
         run: |
-          formula=$(find "${{ github.event.inputs.workDir }}/dist" -name 'porter.rb' | head -1)
+          formula=$(find "$WORK_DIR/dist" -name 'porter.rb' | head -1)
           if [ -z "$formula" ]; then
             echo "No porter.rb formula found in dist output"
             exit 1
           fi
-          gh release upload "${{ github.event.inputs.tagVersion }}" "$formula" \
+          gh release upload "$TAG_VERSION" "$formula" \
             --repo porter-dev/releases --clobber
-        env:
-          GITHUB_TOKEN: ${{ steps.app-token.outputs.token }}

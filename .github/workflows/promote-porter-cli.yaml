@@ -16,10 +16,11 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Validate version
+        env:
+          VERSION: ${{ github.event.inputs.version }}
         run: |
-          version="${{ github.event.inputs.version }}"
-          if ! [[ "$version" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
-            echo "version must look like vX.Y.Z, got: $version"
+          if ! [[ "$VERSION" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "version must look like vX.Y.Z, got: $VERSION"
             exit 1
           fi
 
@@ -35,9 +36,10 @@ jobs:
       # Drives the CLI's own update prompt, which reads the latest-marked
       # release on porter-dev/releases.
       - name: Mark GitHub release as latest
-        run: gh release edit "${{ github.event.inputs.version }}" --repo porter-dev/releases --latest
         env:
           GITHUB_TOKEN: ${{ steps.app-token.outputs.token }}
+          VERSION: ${{ github.event.inputs.version }}
+        run: gh release edit "$VERSION" --repo porter-dev/releases --latest
 
       - name: Checkout homebrew-porter
         uses: actions/checkout@v4
@@ -50,9 +52,11 @@ jobs:
       # release asset (see release-from-tag.yaml), so this push is byte-exact
       # against the released artifacts.
       - name: Publish Homebrew formula
+        env:
+          GITHUB_TOKEN: ${{ steps.app-token.outputs.token }}
+          VERSION: ${{ github.event.inputs.version }}
         run: |
-          version="${{ github.event.inputs.version }}"
-          gh release download "$version" --repo porter-dev/releases --pattern porter.rb --output homebrew-porter/Formula/porter.rb --clobber
+          gh release download "$VERSION" --repo porter-dev/releases --pattern porter.rb --output homebrew-porter/Formula/porter.rb --clobber
           cd homebrew-porter
           git config user.name "porter-ci-app[bot]"
           git config user.email "porter-ci-app[bot]@users.noreply.github.com"
@@ -60,12 +64,12 @@ jobs:
           if git diff --cached --quiet; then
             echo "Formula unchanged, nothing to push"
           else
-            git commit -m "Brew formula update for porter version ${version}"
+            git commit -m "Brew formula update for porter version ${VERSION}"
             git push origin main
           fi
-        env:
-          GITHUB_TOKEN: ${{ steps.app-token.outputs.token }}
 
+      # The repo-scoped GITHUB_TOKEN has write access to this package: it is the
+      # same token release-from-tag.yaml uses to publish it on every release.
       - name: Docker login
         run: echo $GITHUB_TOKEN | docker login ghcr.io -u USERNAME --password-stdin
         env:
@@ -74,23 +78,25 @@ jobs:
       # Re-points the manifest without rebuilding, so :latest is byte-identical
       # to the versioned image.
       - name: Point porter-cli:latest at the promoted version
+        env:
+          VERSION: ${{ github.event.inputs.version }}
         run: |
-          version="${{ github.event.inputs.version }}"
           docker buildx imagetools create \
             --tag "ghcr.io/porter-dev/releases/porter-cli:latest" \
-            "ghcr.io/porter-dev/releases/porter-cli:${version#v}"
+            "ghcr.io/porter-dev/releases/porter-cli:${VERSION#v}"
 
       # Consumed by the install script (via the CDN in front of the release
       # bucket), so this is the step that flips installs to the new version.
       - name: Publish latest pointer
-        run: |
-          echo -n "${{ github.event.inputs.version }}" > latest
-          aws s3 cp latest "s3://${RELEASE_BUCKET}/releases/latest" \
-            --endpoint-url "${RELEASE_BUCKET_ENDPOINT}" \
-            --content-type "text/plain"
         env:
+          VERSION: ${{ github.event.inputs.version }}
           RELEASE_BUCKET: ${{ vars.RELEASE_BUCKET }}
           RELEASE_BUCKET_ENDPOINT: ${{ vars.RELEASE_BUCKET_ENDPOINT }}
           AWS_ACCESS_KEY_ID: ${{ secrets.CLOUDFLARE_R2_ACCESS_KEY_ID }}
           AWS_SECRET_ACCESS_KEY: ${{ secrets.CLOUDFLARE_R2_SECRET_ACCESS_KEY }}
           AWS_DEFAULT_REGION: ${{ vars.RELEASE_BUCKET_REGION }}
+        run: |
+          echo -n "$VERSION" > latest
+          aws s3 cp latest "s3://${RELEASE_BUCKET}/releases/latest" \
+            --endpoint-url "${RELEASE_BUCKET_ENDPOINT}" \
+            --content-type "text/plain"
