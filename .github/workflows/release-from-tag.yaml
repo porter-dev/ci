@@ -41,6 +41,13 @@ jobs:
           token: ${{ steps.app-token.outputs.token }}
           fetch-tags: true
 
+      # GoReleaser reads the message of GORELEASER_CURRENT_TAG from the local clone.
+      # The clone only has the prefixed tag, so create the plain one locally.
+      - name: Create local release tag
+        env:
+          TAG_VERSION: ${{ github.event.inputs.tagVersion }}
+        run: git tag --force "$TAG_VERSION"
+
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v3
 
